@@ -1,0 +1,9 @@
+services:
+  code-executor:
+    build:
+      context: ./main-server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
