@@ -1,9 +1,12 @@
 services:
-  code-executor:
+  execution-service:
     build:
-      context: ./main-server
+      context: .
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - EXECUTION_SERVICE_API_KEY=${EXECUTION_SERVICE_API_KEY:-dev-local-key}
+    # mirrors Render's free tier so local testing catches OOM before deploy
+    mem_limit: 512m

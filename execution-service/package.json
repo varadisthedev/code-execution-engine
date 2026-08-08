@@ -1,0 +1,12 @@
+{
+  "name": "execution-service",
+  "version": "2.0.0",
+  "description": "Sandboxed code execution microservice (Java, C++, C, Python) for the monolith to call per test case",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

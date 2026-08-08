@@ -1,26 +1,23 @@
-FROM ubuntu:22.04
+FROM node:20-bookworm-slim
 
-# Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install all necessary runtimes and tools
-RUN apt-get update && apt-get install -y \
-    nodejs \
-    npm \
-    openjdk-17-jdk \
+# Headless JDK (no GUI libs), gcc/g++, python3 — kept minimal for Render free tier
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jdk-headless \
+    gcc \
     g++ \
     python3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy and install Node.js dependencies
-COPY main-server/package*.json ./
-RUN npm install
+COPY execution-service/package*.json ./
+RUN npm install --omit=dev && npm cache clean --force
 
-# Copy application code
-COPY main-server/ .
+COPY execution-service/ .
 
+ENV NODE_ENV=production
 EXPOSE 3000
 
 CMD ["node", "server.js"]
