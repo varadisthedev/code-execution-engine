@@ -17,7 +17,7 @@ const LANGUAGES = {
   java: {
     sourceFile: "Main.java",
     compiled: true,
-    compile: "javac --release 17 Main.java",
+    compile: "javac -proc:none --release 17 Main.java",
     run: `java -Xmx${JAVA_MAX_HEAP_MB}m -Xss512k -cp . Main`,
   },
   cpp: {

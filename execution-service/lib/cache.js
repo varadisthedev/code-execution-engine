@@ -42,6 +42,13 @@ async function compileAndStore(hash, dir, compileFn) {
   try {
     await fs.mkdir(dir, { recursive: true });
     const compileError = await compileFn(dir);
+    // Timeouts are capacity failures, not a property of the source. Caching
+    // them would pin every retry to the first 10s kill after a deploy.
+    if (compileError && /timed out/i.test(compileError)) {
+      store.delete(hash);
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      return { dir, compileError };
+    }
     evict().catch(() => {}); // housekeeping, doesn't block the response
     return { dir, compileError: compileError || undefined };
   } catch (err) {

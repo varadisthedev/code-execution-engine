@@ -13,7 +13,7 @@ const { LANGUAGES } = require("../lib/languages");
 const TMP_ROOT = process.env.EXEC_TMP_DIR || os.tmpdir();
 const DEFAULT_TIMEOUT_MS = Number(process.env.DEFAULT_TIMEOUT_MS) || 5000;
 const HARD_MAX_TIMEOUT_MS = Number(process.env.HARD_MAX_TIMEOUT_MS) || 15000;
-const COMPILE_TIMEOUT_MS = Number(process.env.COMPILE_TIMEOUT_MS) || 10000;
+const COMPILE_TIMEOUT_MS = Math.max(Number(process.env.COMPILE_TIMEOUT_MS) || 25000, 25000);
 
 function resolveTimeout(requested) {
   const n = Number(requested);
@@ -33,6 +33,10 @@ router.post("/execute", async (req, res) => {
 
   const lang = LANGUAGES[language];
   const timeout = resolveTimeout(timeoutMs);
+
+  console.log(
+    `[execute] language=${language} sourceBytes=${Buffer.byteLength(sourceCode)} timeoutMs=${timeout} compileTimeoutMs=${COMPILE_TIMEOUT_MS}`
+  );
 
   try {
     await pool.acquireSlot();
@@ -57,7 +61,10 @@ router.post("/execute", async (req, res) => {
           cwd: dir,
           timeoutMs: COMPILE_TIMEOUT_MS,
         });
-        if (result.exitCode !== 0 || result.timedOut) {
+        if (result.timedOut) {
+          return `Compilation timed out after ${COMPILE_TIMEOUT_MS}ms`;
+        }
+        if (result.exitCode !== 0) {
           return (result.stderr || result.stdout || "Compilation failed").trim();
         }
         return undefined;
