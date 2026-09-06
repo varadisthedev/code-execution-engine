@@ -81,4 +81,8 @@ async function resetOnBoot() {
   await fs.mkdir(CACHE_DIR, { recursive: true });
 }
 
-module.exports = { getOrCompile, resetOnBoot };
+function getStats() {
+  return { entries: store.size, maxEntries: MAX_ENTRIES };
+}
+
+module.exports = { getOrCompile, resetOnBoot, getStats };

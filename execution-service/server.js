@@ -3,6 +3,7 @@ const executeRouter = require("./routes/execute");
 const healthRouter = require("./routes/health");
 const { requireApiKey } = require("./lib/auth");
 const cache = require("./lib/cache");
+const metrics = require("./lib/metrics");
 
 if (!process.env.EXECUTION_SERVICE_API_KEY) {
   console.error("EXECUTION_SERVICE_API_KEY is not set — refusing to start open to the internet");
@@ -12,9 +13,12 @@ if (!process.env.EXECUTION_SERVICE_API_KEY) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+metrics.start();
+
 // No CORS: this is an internal service the monolith calls server-to-server,
-// never a browser. Auth runs before body parsing so unauthorized requests
-// don't pay JSON-parse cost.
+// never a browser. Public GET /health is unauthenticated. Auth runs before
+// body parsing on /execute so unauthorized requests don't pay JSON-parse cost.
+app.use(healthRouter);
 app.use(requireApiKey);
 app.use(express.json({ limit: "256kb" }));
 app.use((err, req, res, next) => {
@@ -25,7 +29,6 @@ app.use((err, req, res, next) => {
   next();
 });
 
-app.use(healthRouter);
 app.use(executeRouter);
 
 (async () => {

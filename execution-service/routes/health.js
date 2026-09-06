@@ -1,34 +1,40 @@
 const express = require("express");
 const router = express.Router();
-const os = require("os");
 
 const pool = require("../lib/executionPool");
+const cache = require("../lib/cache");
+const metrics = require("../lib/metrics");
+const { requireApiKey } = require("../lib/auth");
 const { checkAllToolchains } = require("../lib/toolchain");
+const { version } = require("../package.json");
 
-const round = (n) => Math.round(n * 100) / 100;
+function publicBody() {
+  const snapshot = metrics.getSnapshot();
+  return {
+    status: "ok",
+    service: "execution-service",
+    timestamp: new Date().toISOString(),
+    version,
+    ...snapshot,
+  };
+}
 
-router.get("/health", async (req, res) => {
+router.get("/health", (req, res) => {
+  res.json(publicBody());
+});
+
+router.get("/health/details", requireApiKey, async (req, res) => {
   const toolchains = await checkAllToolchains();
   const jdkAvailable = toolchains.javac.available && toolchains.java.available;
   const allAvailable = Object.values(toolchains).every((t) => t.available);
 
-  const mem = process.memoryUsage();
-  const totalMem = os.totalmem();
-  const freeMem = os.freemem();
-
   res.status(allAvailable ? 200 : 503).json({
-    service: "execution-service",
+    ...publicBody(),
+    status: allAvailable ? "ok" : "degraded",
     jdk: { available: jdkAvailable, jdk: toolchains.javac },
     toolchains,
     execution: pool.getStats(),
-    memory: {
-      processRssMb: round(mem.rss / 1024 / 1024),
-      systemTotalMb: round(totalMem / 1024 / 1024),
-      systemFreeMb: round(freeMem / 1024 / 1024),
-      systemUsedPercent: round(((totalMem - freeMem) / totalMem) * 100),
-    },
-    cpu: { cores: os.cpus().length, loadAvg1m: round(os.loadavg()[0]) },
-    uptimeSeconds: Math.round(process.uptime()),
+    cache: cache.getStats(),
   });
 });
 

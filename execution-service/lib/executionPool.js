@@ -29,7 +29,7 @@ function releaseSlot() {
 }
 
 function getStats() {
-  return { active, queued: queue.length, maxConcurrent: MAX_CONCURRENT };
+  return { active, queued: queue.length, maxConcurrent: MAX_CONCURRENT, maxQueue: MAX_QUEUE };
 }
 
 module.exports = { acquireSlot, releaseSlot, getStats };
