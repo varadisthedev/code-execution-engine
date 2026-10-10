@@ -14,6 +14,10 @@ const TMP_ROOT = process.env.EXEC_TMP_DIR || os.tmpdir();
 const DEFAULT_TIMEOUT_MS = Number(process.env.DEFAULT_TIMEOUT_MS) || 5000;
 const HARD_MAX_TIMEOUT_MS = Number(process.env.HARD_MAX_TIMEOUT_MS) || 15000;
 const MAX_BATCH = Number(process.env.MAX_BATCH_RUNS) || 50;
+// A batch holds one pool slot, so bound its total wall time and response size
+// or it becomes a way around MAX_CONCURRENT / MAX_QUEUE.
+const BATCH_BUDGET_MS = Number(process.env.BATCH_BUDGET_MS) || 30000;
+const BATCH_STREAM_CAP = 128 * 1024; // chars per stdout/stderr, per run
 const COMPILE_TIMEOUT_MS = Math.max(Number(process.env.COMPILE_TIMEOUT_MS) || 25000, 25000);
 
 function resolveTimeout(requested) {
@@ -108,7 +112,20 @@ router.post("/execute", async (req, res) => {
 
     if (batch) {
       const results = [];
-      for (const input of batch) results.push({ ...(await runOne(input)), cacheHit });
+      const deadline = Date.now() + BATCH_BUDGET_MS;
+      for (const input of batch) {
+        if (Date.now() >= deadline) {
+          results.push({ stdout: "", stderr: "", exitCode: null, timedOut: true, runtimeMs: 0, cacheHit });
+          continue;
+        }
+        const r = await runOne(input);
+        results.push({
+          ...r,
+          stdout: r.stdout.slice(0, BATCH_STREAM_CAP),
+          stderr: r.stderr.slice(0, BATCH_STREAM_CAP),
+          cacheHit,
+        });
+      }
       return res.json({ results });
     }
 
