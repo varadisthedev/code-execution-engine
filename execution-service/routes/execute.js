@@ -13,6 +13,7 @@ const { LANGUAGES } = require("../lib/languages");
 const TMP_ROOT = process.env.EXEC_TMP_DIR || os.tmpdir();
 const DEFAULT_TIMEOUT_MS = Number(process.env.DEFAULT_TIMEOUT_MS) || 5000;
 const HARD_MAX_TIMEOUT_MS = Number(process.env.HARD_MAX_TIMEOUT_MS) || 15000;
+const MAX_BATCH = Number(process.env.MAX_BATCH_RUNS) || 50;
 const COMPILE_TIMEOUT_MS = Math.max(Number(process.env.COMPILE_TIMEOUT_MS) || 25000, 25000);
 
 function resolveTimeout(requested) {
@@ -22,7 +23,12 @@ function resolveTimeout(requested) {
 }
 
 router.post("/execute", async (req, res) => {
-  const { language, sourceCode, stdin, timeoutMs } = req.body || {};
+  const { language, sourceCode, stdin, stdins, timeoutMs } = req.body || {};
+  // Batch mode: one compile + one pool slot, then one run per stdin.
+  const batch = Array.isArray(stdins) ? stdins : null;
+  if (batch && (batch.length === 0 || batch.length > MAX_BATCH)) {
+    return res.status(400).json({ error: `stdins must hold 1-${MAX_BATCH} entries` });
+  }
 
   if (!LANGUAGES[language]) {
     return res.status(400).json({ error: "Unsupported language" });
@@ -91,13 +97,22 @@ router.post("/execute", async (req, res) => {
       runDir = scratchDir;
     }
 
-    const result = await sandbox.run({
-      command: lang.run,
-      cwd: runDir,
-      stdin,
-      timeoutMs: timeout,
-      memoryLimitKb: lang.memoryLimitKb,
-    });
+    const runOne = (input) =>
+      sandbox.run({
+        command: lang.run,
+        cwd: runDir,
+        stdin: input,
+        timeoutMs: timeout,
+        memoryLimitKb: lang.memoryLimitKb,
+      });
+
+    if (batch) {
+      const results = [];
+      for (const input of batch) results.push({ ...(await runOne(input)), cacheHit });
+      return res.json({ results });
+    }
+
+    const result = await runOne(stdin);
 
     res.json({ ...result, compileError: undefined, cacheHit });
   } catch (error) {
